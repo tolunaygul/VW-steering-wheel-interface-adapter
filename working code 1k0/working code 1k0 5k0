@@ -1,0 +1,122 @@
+#include <mcp_can.h>  // library for MCP2515 ic
+#include <SPI.h>      // library for SPI communication
+
+long unsigned int rxId;  // storage for can data
+unsigned char len = 0;   // storage for can data
+unsigned char rxBuf[8];  // storage for can data
+
+#define CAN0_INT 3  // Set INT to pin 2 for CAN interface 0
+#define CAN1_INT 2 
+MCP_CAN CAN0(10);   // set CS pin to 10 for CAN interface 0
+MCP_CAN CAN1( 9);
+
+bool park_on = 0; // boolean for keep track of park light on and off
+
+// Bool and bytes for the ignition switch 
+bool sleutel, klem15, starter;
+byte mBSG_byte = 0;
+byte mBSG_3    = 0;
+
+unsigned long task1Interval    = 50;  // 50ms interval for keep aliv frame
+unsigned long task2Interval    = 20;  // 30ms interval for button info frame
+unsigned long KAintervalMillis = 0;   // storage for millis counter
+unsigned long ledpuls          = 100; // storage for millis counter
+
+unsigned long task1Millis   = 0;      // storage for millis counter
+unsigned long task2Millis   = 0;      // storage for millis counter
+unsigned long task3Millis   = 0;      // storage for millis counter
+unsigned long ledpulsmillis = 0;      // storage for millis counter
+
+byte out1 = 14;   // rename pin 14 to out1 for LED1
+byte out2 = 15;   // rename pin 15 to out1 for LED2
+byte out3 = 16;   // rename pin 16 to out1 for LED3
+bool ledState = 0;
+
+void setup() {
+  // start serial port an send a message with delay for starting
+  Serial.begin(115200);
+  delay(50);
+
+  // initialize canbus with 1000kbit and 16mhz xtal
+  CAN0.begin(MCP_ANY, CAN_100KBPS, MCP_16MHZ);
+  CAN0.setMode(MCP_NORMAL);
+
+  CAN1.begin(MCP_ANY, CAN_500KBPS, MCP_16MHZ);
+  CAN1.setMode(MCP_NORMAL);
+
+  pinMode(CAN0_INT, INPUT);      // set INT pin to be an input
+  digitalWrite(CAN0_INT, HIGH);  // set INT pin high to enable interna pullup
+  
+  
+  pinMode(5, INPUT);
+  digitalWrite(5, HIGH);
+
+
+
+}
+
+void loop() {
+
+    unsigned long currentMillis = millis();  // Get current time in milliseconds
+
+    if (currentMillis - ledpulsmillis >= ledpuls) // interval timer for onboard LED pulsing
+      {
+        ledpulsmillis = currentMillis;
+        ledpulsout();
+      }
+
+  if (!digitalRead(CAN0_INT))  // If CAN0_INT pin is low, read receive buffer
+  {
+        digitalWrite(out2, HIGH);
+
+    CAN0.readMsgBuf(&rxId, &len, rxBuf);  // Read data: len = data length, buf = data byte(s)
+    canRead(); // execute canRead function to negotiate with ecu
+        digitalWrite(out2, LOW);
+
+      
+
+  }
+  
+
+
+}
+
+void ledpulsout() 
+{
+    if (ledState == LOW) {
+          ledState = HIGH;
+        } else {
+          ledState = LOW;
+        }
+
+       // digitalWrite(out3, ledState);  // Apply the new LED state  
+
+      byte mDimmung[3] = {0x00, 0x00, 0x00};
+      if (digitalRead(5)) {mDimmung[0] = 0, mDimmung[1] = 0;}
+      if (!digitalRead(5)) {mDimmung[0] = 100, mDimmung[1] = 100;}
+      CAN0.sendMsgBuf(0x635, 0, 3, mDimmung);  // send the can message onto the bus
+      Serial.println(mDimmung[0]);
+}
+
+
+void canRead(){
+    if (rxId == 0x2c3)
+    {
+      sleutel = bitRead(rxBuf[0], 0);
+      klem15  = bitRead(rxBuf[0], 1);
+      starter = bitRead(rxBuf[0], 3); 
+
+      byte mBSG_3[4] = { mBSG_byte, 0x00, 0x00, 0x00};
+      if (sleutel == 1) {bitSet(mBSG_byte,0);} else {bitClear(mBSG_byte,0);}
+      if (klem15  == 1) {bitSet(mBSG_byte,1);} else {bitClear(mBSG_byte,1);}
+      CAN0.sendMsgBuf(0x575, 0, 4, mBSG_3);  // send the can message onto the bus
+   }
+
+    if (rxId == 0x289)
+    {
+     CAN1.sendMsgBuf(0x38A, 0, 4, rxBuf);
+     digitalWrite(out1, bitRead(rxBuf[3],1));
+     digitalWrite(out3, bitRead(rxBuf[3],0));
+    }
+
+ }
