@@ -48,8 +48,7 @@ void setup() {
   digitalWrite(CAN0_INT, HIGH);  // set INT pin high to enable interna pullup
   
   
-  pinMode(5, INPUT);
-  digitalWrite(5, HIGH);
+  pinMode(6, INPUT);
 
 
 
@@ -92,8 +91,8 @@ void ledpulsout()
        // digitalWrite(out3, ledState);  // Apply the new LED state  
 
       byte mDimmung[3] = {0x00, 0x00, 0x00};
-      if (digitalRead(5)) {mDimmung[0] = 0, mDimmung[1] = 0;}
-      if (!digitalRead(5)) {mDimmung[0] = 100, mDimmung[1] = 100;}
+      if (digitalRead(6)) {mDimmung[0] = 0, mDimmung[1] = 0;}
+      if (!digitalRead(6)) {mDimmung[0] = 100, mDimmung[1] = 100;}
       CAN0.sendMsgBuf(0x635, 0, 3, mDimmung);  // send the can message onto the bus
 }
 
